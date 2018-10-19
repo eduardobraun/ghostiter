@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 
 #[derive(Debug, PartialEq)]
-struct FwdCycl2<'a, T>(&'a T, &'a T);
+struct FwdCycl2<'a, T>(PhantomData<&'a T>);
 #[derive(Debug, PartialEq)]
-struct FwdCycl4<'a, T>(&'a T, &'a T, &'a T, &'a T);
+struct FwdCycl4<'a, T>(PhantomData<&'a T>);
 #[derive(Debug, PartialEq)]
-struct BkdCycl2<'a, T>(&'a T, &'a T);
+struct BkdCycl2<'a, T>(PhantomData<&'a T>);
 // type WB2C<'a, T> = (&'a T, &'a T);
 // type WC3C<'a, T> = (&'a T, &'a T, &'a T);
 // type WF4C<'a, T> = (&'a T, &'a T, &'a T, &'a T);
@@ -22,7 +22,7 @@ trait Windowed<'a, T> {
 }
 
 impl<'a, T> Windowed<'a, T> for FwdCycl2<'a, T> {
-    type Item = FwdCycl2<'a, T>;
+    type Item = (&'a T, &'a T);
     type WIter = VecWindowedIterator<'a, T, Self>;
     fn into_window(vector: &'a Vec<T>, index: usize) -> Option<Self::Item> {
         let len = vector.len();
@@ -39,7 +39,7 @@ impl<'a, T> Windowed<'a, T> for FwdCycl2<'a, T> {
             } else {
                 ip1 = vector.get(index + 1).unwrap();
             }
-            FwdCycl2(i, ip1)
+            (i, ip1)
         };
         Some(result)
     }
@@ -53,7 +53,7 @@ impl<'a, T> Windowed<'a, T> for FwdCycl2<'a, T> {
 }
 
 impl<'a, T> Windowed<'a, T> for FwdCycl4<'a, T> {
-    type Item = FwdCycl4<'a, T>;
+    type Item = (&'a T, &'a T, &'a T, &'a T);
     type WIter = VecWindowedIterator<'a, T, Self>;
     fn into_window(vector: &'a Vec<T>, index: usize) -> Option<Self::Item> {
         let len = vector.len();
@@ -83,7 +83,7 @@ impl<'a, T> Windowed<'a, T> for FwdCycl4<'a, T> {
                 ip1 = vector.get(index + 1).unwrap();
                 ip2 = vector.get(index + 2).unwrap();
             }
-            FwdCycl4(im1, i, ip1, ip2)
+            (im1, i, ip1, ip2)
         };
         Some(result)
     }
@@ -97,8 +97,8 @@ impl<'a, T> Windowed<'a, T> for FwdCycl4<'a, T> {
 }
 
 impl<'a, T> Windowed<'a, T> for BkdCycl2<'a, T> {
-    type Item = BkdCycl2<'a, T>;
-    type WIter = VecWindowedIterator<'a, T, Self::Item>;
+    type Item = (&'a T, &'a T);
+    type WIter = VecWindowedIterator<'a, T, Self>;
     fn into_window(vector: &'a Vec<T>, index: usize) -> Option<Self::Item> {
         let len = vector.len();
         if index >= len || len < 2 {
@@ -114,7 +114,7 @@ impl<'a, T> Windowed<'a, T> for BkdCycl2<'a, T> {
             } else {
                 im1 = vector.get(index - 1).unwrap();
             }
-            BkdCycl2(im1, i)
+            (im1, i)
         };
         Some(result)
     }
@@ -172,15 +172,15 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut it = v.into_witer::<FwdCycl2<u8>>();
         let tp = it.next().unwrap();
-        assert_eq!(tp, FwdCycl2::<u8>(&1, &2));
+        assert_eq!(tp, (&1, &2));
         let tp = it.next().unwrap();
-        assert_eq!(tp, FwdCycl2::<u8>(&2, &3));
+        assert_eq!(tp, (&2, &3));
         let tp = it.next().unwrap();
-        assert_eq!(tp, FwdCycl2::<u8>(&3, &4));
+        assert_eq!(tp, (&3, &4));
         let tp = it.next().unwrap();
-        assert_eq!(tp, FwdCycl2::<u8>(&4, &5));
+        assert_eq!(tp, (&4, &5));
         let tp = it.next().unwrap();
-        assert_eq!(tp, FwdCycl2::<u8>(&5, &1));
+        assert_eq!(tp, (&5, &1));
         let tp = it.next();
         assert_eq!(tp, None);
     }
@@ -190,15 +190,15 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut it = v.into_witer::<BkdCycl2<u8>>();
         let tp = it.next().unwrap();
-        assert_eq!(tp, BkdCycl2::<u8>(&5, &1));
+        assert_eq!(tp, (&5, &1));
         let tp = it.next().unwrap();
-        assert_eq!(tp, BkdCycl2::<u8>(&1, &2));
+        assert_eq!(tp, (&1, &2));
         let tp = it.next().unwrap();
-        assert_eq!(tp, BkdCycl2::<u8>(&2, &3));
+        assert_eq!(tp, (&2, &3));
         let tp = it.next().unwrap();
-        assert_eq!(tp, BkdCycl2::<u8>(&3, &4));
+        assert_eq!(tp, (&3, &4));
         let tp = it.next().unwrap();
-        assert_eq!(tp, BkdCycl2::<u8>(&4, &5));
+        assert_eq!(tp, (&4, &5));
         let tp = it.next();
         assert_eq!(tp, None);
     }
@@ -208,7 +208,7 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 1;
         let mut v2: u8 = 2;
-        for FwdCycl2(i, ip1) in v.into_witer::<FwdCycl2<u8>>() {
+        for (i, ip1) in v.into_witer::<FwdCycl2<u8>>() {
             assert_eq!(*i, v1);
             assert_eq!(*ip1, v2);
             v1 += 1;
@@ -226,7 +226,7 @@ mod tests {
         let mut v2: u8 = 1;
         let mut v3: u8 = 2;
         let mut v4: u8 = 3;
-        for FwdCycl4(im1, i, ip1, ip2) in v.into_witer::<FwdCycl4<u8>>() {
+        for (im1, i, ip1, ip2) in v.into_witer::<FwdCycl4<u8>>() {
             assert_eq!(*im1, v1);
             assert_eq!(*i, v2);
             assert_eq!(*ip1, v3);
