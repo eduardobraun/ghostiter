@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-#[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 struct FwdCycl2<'a, T>(PhantomData<&'a T>);
-#[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 struct FwdCycl4<'a, T>(PhantomData<&'a T>);
-#[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 struct BkdCycl2<'a, T>(PhantomData<&'a T>);
 // type WB2C<'a, T> = (&'a T, &'a T);
 // type WC3C<'a, T> = (&'a T, &'a T, &'a T);
@@ -32,12 +32,12 @@ impl<'a, T> Windowed<'a, T> for FwdCycl2<'a, T> {
         let result = {
             let i: &T;
             let ip1: &T;
-            i = vector.get(index).unwrap();
+            i = vector.get(index).expect("Failed to get item from Vec");
 
             if index == len - 1 {
-                ip1 = vector.get(0).unwrap();
+                ip1 = vector.get(0).expect("Failed to get item from Vec");
             } else {
-                ip1 = vector.get(index + 1).unwrap();
+                ip1 = vector.get(index + 1).expect("Failed to get item from Vec");
             }
             (i, ip1)
         };
@@ -65,23 +65,23 @@ impl<'a, T> Windowed<'a, T> for FwdCycl4<'a, T> {
             let i: &T;
             let ip1: &T;
             let ip2: &T;
-            i = vector.get(index).unwrap();
+            i = vector.get(index).expect("Failed to get item from Vec");
 
             if index == 0 {
-                im1 = vector.get(len - 1).unwrap();
+                im1 = vector.get(len - 1).expect("Failed to get item from Vec");
             } else {
-                im1 = vector.get(index - 1).unwrap();
+                im1 = vector.get(index - 1).expect("Failed to get item from Vec");
             }
 
             if index == len - 1 {
-                ip1 = vector.get(0).unwrap();
-                ip2 = vector.get(1).unwrap();
+                ip1 = vector.get(0).expect("Failed to get item from Vec");
+                ip2 = vector.get(1).expect("Failed to get item from Vec");
             } else if index == len - 2 {
-                ip1 = vector.get(index + 1).unwrap();
-                ip2 = vector.get(0).unwrap();
+                ip1 = vector.get(index + 1).expect("Failed to get item from Vec");
+                ip2 = vector.get(0).expect("Failed to get item from Vec");
             } else {
-                ip1 = vector.get(index + 1).unwrap();
-                ip2 = vector.get(index + 2).unwrap();
+                ip1 = vector.get(index + 1).expect("Failed to get item from Vec");
+                ip2 = vector.get(index + 2).expect("Failed to get item from Vec");
             }
             (im1, i, ip1, ip2)
         };
@@ -107,12 +107,12 @@ impl<'a, T> Windowed<'a, T> for BkdCycl2<'a, T> {
         let result = {
             let i: &T;
             let im1: &T;
-            i = vector.get(index).unwrap();
+            i = vector.get(index).expect("Failed to get item from Vec");
 
             if index == 0 {
-                im1 = vector.get(len - 1).unwrap();
+                im1 = vector.get(len - 1).expect("Failed to get item from Vec");
             } else {
-                im1 = vector.get(index - 1).unwrap();
+                im1 = vector.get(index - 1).expect("Failed to get item from Vec");
             }
             (im1, i)
         };
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn forward_window() {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
-        let mut it = v.into_witer::<FwdCycl2<u8>>();
+        let mut it = v.into_witer::<FwdCycl2<_>>();
         let tp = it.next().unwrap();
         assert_eq!(tp, (&1, &2));
         let tp = it.next().unwrap();
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn backward_window() {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
-        let mut it = v.into_witer::<BkdCycl2<u8>>();
+        let mut it = v.into_witer::<BkdCycl2<_>>();
         let tp = it.next().unwrap();
         assert_eq!(tp, (&5, &1));
         let tp = it.next().unwrap();
@@ -208,7 +208,7 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 1;
         let mut v2: u8 = 2;
-        for (i, ip1) in v.into_witer::<FwdCycl2<u8>>() {
+        for (i, ip1) in v.into_witer::<FwdCycl2<_>>() {
             assert_eq!(*i, v1);
             assert_eq!(*ip1, v2);
             v1 += 1;
@@ -226,7 +226,7 @@ mod tests {
         let mut v2: u8 = 1;
         let mut v3: u8 = 2;
         let mut v4: u8 = 3;
-        for (im1, i, ip1, ip2) in v.into_witer::<FwdCycl4<u8>>() {
+        for (im1, i, ip1, ip2) in v.into_witer::<FwdCycl4<_>>() {
             assert_eq!(*im1, v1);
             assert_eq!(*i, v2);
             assert_eq!(*ip1, v3);
