@@ -1,0 +1,7 @@
+[package]
+name = "ghostiter"
+version = "0.1.0"
+authors = ["Eduardo Braun <eduardo@rushers.org>"]
+edition = "2018"
+
+[dependencies]
