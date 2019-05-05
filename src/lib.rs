@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 // use std::rc::Rc;
 
 #[allow(dead_code)]
-struct FwdCycl2<'a, T>(PhantomData<&'a T>);
+struct Fwd2<'a, T>(PhantomData<&'a T>);
 #[allow(dead_code)]
-struct FwdCycl4<'a, T>(PhantomData<&'a T>);
+struct Fwd4<'a, T>(PhantomData<&'a T>);
 #[allow(dead_code)]
-struct BkdCycl2<'a, T>(PhantomData<&'a T>);
+struct Bkd2<'a, T>(PhantomData<&'a T>);
 // type WB2C<'a, T> = (&'a T, &'a T);
 // type WC3C<'a, T> = (&'a T, &'a T, &'a T);
 // type WF4C<'a, T> = (&'a T, &'a T, &'a T, &'a T);
@@ -16,6 +16,7 @@ struct BkdCycl2<'a, T>(PhantomData<&'a T>);
 // type WB6C<'a, T> = (&'a T, &'a T, &'a T, &'a T, &'a T, &'a T);
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 enum BorderAction<T>
 where
     T: Copy,
@@ -75,7 +76,7 @@ where
     fn into_witer(vec: &'a Vec<T>, border: BorderAction<T>) -> Self::WIter;
 }
 
-impl<'a, T> Windowed<'a, T> for FwdCycl2<'a, T>
+impl<'a, T> Windowed<'a, T> for Fwd2<'a, T>
 where
     T: Copy,
     std::vec::Vec<T>: GetOr<'a, T>,
@@ -122,7 +123,7 @@ where
     }
 }
 
-impl<'a, T> Windowed<'a, T> for FwdCycl4<'a, T>
+impl<'a, T> Windowed<'a, T> for Fwd4<'a, T>
 where
     T: Copy,
     std::vec::Vec<T>: GetOr<'a, T>,
@@ -200,7 +201,7 @@ where
     }
 }
 
-impl<'a, T> Windowed<'a, T> for BkdCycl2<'a, T>
+impl<'a, T> Windowed<'a, T> for Bkd2<'a, T>
 where
     T: Copy,
     std::vec::Vec<T>: GetOr<'a, T>,
@@ -302,7 +303,7 @@ mod tests {
     fn forward_window() {
         use self::BorderAction::Cycle;
         let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
-        let mut it = v.into_witer::<FwdCycl2<_>>(Cycle);
+        let mut it = v.into_witer::<Fwd2<_>>(Cycle);
         let tp = it.next().unwrap();
         assert_eq!(tp, (&1., &2.));
         let tp = it.next().unwrap();
@@ -321,7 +322,7 @@ mod tests {
     fn backward_window() {
         use self::BorderAction::Cycle;
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
-        let mut it = v.into_witer::<BkdCycl2<_>>(Cycle);
+        let mut it = v.into_witer::<Bkd2<_>>(Cycle);
         let tp = it.next().unwrap();
         assert_eq!(tp, (&5, &1));
         let tp = it.next().unwrap();
@@ -342,7 +343,7 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 1;
         let mut v2: u8 = 2;
-        for (i, ip1) in v.into_witer::<FwdCycl2<_>>(Cycle) {
+        for (i, ip1) in v.into_witer::<Fwd2<_>>(Cycle) {
             assert_eq!(*i, v1);
             assert_eq!(*ip1, v2);
             v1 += 1;
@@ -361,7 +362,7 @@ mod tests {
         let mut v2: u8 = 1;
         let mut v3: u8 = 2;
         let mut v4: u8 = 3;
-        for (im1, i, ip1, ip2) in v.into_witer::<FwdCycl4<_>>(Cycle) {
+        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4<_>>(Cycle) {
             assert_eq!(*im1, v1);
             assert_eq!(*i, v2);
             assert_eq!(*ip1, v3);
