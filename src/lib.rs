@@ -1,40 +1,26 @@
 use std::marker::PhantomData;
-// use std::rc::Rc;
 
 #[allow(dead_code)]
-struct Fwd2<'a, T>(PhantomData<&'a T>);
+struct Fwd2<T>(PhantomData<T>);
 #[allow(dead_code)]
-struct Fwd4<'a, T>(PhantomData<&'a T>);
+struct Fwd4<T>(PhantomData<T>);
 #[allow(dead_code)]
-struct Bkd2<'a, T>(PhantomData<&'a T>);
-// type WB2C<'a, T> = (&'a T, &'a T);
-// type WC3C<'a, T> = (&'a T, &'a T, &'a T);
-// type WF4C<'a, T> = (&'a T, &'a T, &'a T, &'a T);
-// type WB4C<'a, T> = (&'a T, &'a T, &'a T, &'a T);
-// type WC5C<'a, T> = (&'a T, &'a T, &'a T, &'a T, &'a T);
-// type WF6C<'a, T> = (&'a T, &'a T, &'a T, &'a T, &'a T, &'a T);
-// type WB6C<'a, T> = (&'a T, &'a T, &'a T, &'a T, &'a T, &'a T);
+struct Bkd2<T>(PhantomData<T>);
 
-#[derive(Clone, Copy)]
-#[allow(dead_code)]
-enum BorderAction<T>
+struct Cycle<T> ( PhantomData<T> );
+struct Mirror<T> ( PhantomData<T> );
+struct Constant<'a, T> ( &'a T );
+
+trait BorderAction<'a, T> {
+    fn get_border(&self, vector: &'a Vec<T>, index: i64) -> Option<&'a T>;
+}
+
+impl<'a, T> BorderAction<'a,T> for Cycle<T>
 where
-    T: Copy,
+    T:Copy,
 {
-    Constant(T),
-    Cycle,
-    Mirror,
-}
-
-trait GetOr<'a, T> {
-    fn get_or_cycle(&'a self, index: i64) -> Option<&'a T>;
-    fn get_or_mirror(&'a self, index: i64) -> Option<&'a T>;
-    fn get_or_constant(&'a self, index: i64, constant: &'a T) -> Option<&'a T>;
-}
-
-impl<'a, T> GetOr<'a, T> for Vec<T> {
-    fn get_or_cycle(&'a self, index: i64) -> Option<&'a T> {
-        let len = self.len() as i64;
+    fn get_border(&self, vector: &'a Vec<T>, index: i64) -> Option<&'a T> {
+        let len = vector.len() as i64;
         let mut i = index;
         while i < 0 {
             i += len;
@@ -42,11 +28,16 @@ impl<'a, T> GetOr<'a, T> for Vec<T> {
         while i >= len {
             i -= len;
         }
-        self.get(i as usize)
+        vector.get(i as usize)
     }
+}
 
-    fn get_or_mirror(&'a self, index: i64) -> Option<&'a T> {
-        let len = self.len() as i64;
+impl<'a, T> BorderAction<'a,T> for Mirror<T>
+where
+    T:Copy,
+{
+    fn get_border(&self, vector: &'a Vec<T>, index: i64) -> Option<&'a T> {
+        let len = vector.len() as i64;
         let mut i = index;
         if i < 0 {
             i *= -1;
@@ -54,144 +45,115 @@ impl<'a, T> GetOr<'a, T> for Vec<T> {
         if i >= len {
             i = (len - 1) - (i % len);
         }
-        self.get(i as usize)
+        vector.get(i as usize)
     }
+}
 
-    fn get_or_constant(&'a self, index: i64, constant: &'a T) -> Option<&'a T> {
+impl<'a, T> BorderAction<'a,T> for Constant<'a, T>
+where
+    T:Copy,
+{
+    fn get_border(&self, _vector: &'a Vec<T>, _index: i64) -> Option<&'a T> {
+        Some(self.0)
+    }
+}
+
+trait GetOr<'a, T, A> 
+where
+    T: Copy,
+    A: 'a+BorderAction<'a,T>,
+{
+    fn get_or_border(&'a self, index: i64, border: &'a A) -> Option<&'a T>;
+}
+
+impl<'a, T, A> GetOr<'a, T, A> for Vec<T>
+where
+    T: Copy,
+    A: 'a+BorderAction<'a,T>,
+{
+    fn get_or_border(&'a self, index: i64, border: &'a A) -> Option<&'a T> {
         let len = self.len() as i64;
         if index < 0 || index >= len {
-            return Some(constant);
+            return border.get_border(self, index);
         };
         self.get(index as usize)
     }
 }
 
-trait Windowed<'a, T>
+trait Windowed<'a, T, A>
 where
     T: Copy,
+    A: 'a+BorderAction<'a,T>,
 {
     type Item;
     type WIter;
-    fn into_window(vec: &'a Vec<T>, index: usize, border: BorderAction<T>) -> Option<Self::Item>;
-    fn into_witer(vec: &'a Vec<T>, border: BorderAction<T>) -> Self::WIter;
+    fn into_window(vec: &'a Vec<T>, index: usize, border: &'a A) -> Option<Self::Item>;
+    fn into_witer(vec: &'a Vec<T>, border: &'a A) -> Self::WIter;
 }
 
-impl<'a, T> Windowed<'a, T> for Fwd2<'a, T>
+impl<'a, T, A> Windowed<'a, T, A> for Fwd2<T>
 where
-    T: Copy,
-    std::vec::Vec<T>: GetOr<'a, T>,
+    T: 'a+Copy,
+    std::vec::Vec<T>: GetOr<'a, T, A>,
+    A: 'a+BorderAction<'a, T>,
 {
     type Item = (&'a T, &'a T);
-    type WIter = VecWindowedIterator<'a, T, Self>;
+    type WIter = VecWindowedIterator<'a, T, A, Self>;
     fn into_window(
         vector: &'a Vec<T>,
         index: usize,
-        border: BorderAction<T>,
+        border: &'a A,
     ) -> Option<Self::Item> {
         if index >= vector.len() {
             return None;
         }
 
-        match border {
-            BorderAction::Constant(_c) => None,
-            BorderAction::Cycle => Some((
-                vector
-                    .get_or_cycle(index as i64)
+        Some((vector.get_or_border(index as i64, &border)
                     .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_cycle(index as i64 + 1)
-                    .expect("Failed to get item from Vec"),
-            )),
-            BorderAction::Mirror => Some((
-                vector
-                    .get_or_mirror(index as i64)
-                    .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_mirror(index as i64 + 1)
-                    .expect("Failed to get item from Vec"),
-            )),
-        }
+              vector.get_or_border(index as i64+1, &border)
+                    .expect("Failed to get item from Vec")
+                    ))
     }
 
-    fn into_witer(vec: &'a Vec<T>, border: BorderAction<T>) -> Self::WIter {
+    fn into_witer(vec: &'a Vec<T>, border: &'a A) -> Self::WIter {
         VecWindowedIterator {
             vector: vec,
             index: 0,
-            border: border,
+            border,
             phantom: PhantomData,
         }
     }
 }
 
-impl<'a, T> Windowed<'a, T> for Fwd4<'a, T>
+impl<'a, T, A> Windowed<'a, T, A> for Fwd4<T>
 where
-    T: Copy,
-    std::vec::Vec<T>: GetOr<'a, T>,
+    T: 'a+Copy,
+    A: 'a+BorderAction<'a, T>,
+    std::vec::Vec<T>: GetOr<'a, T, A>,
 {
     type Item = (&'a T, &'a T, &'a T, &'a T);
-    type WIter = VecWindowedIterator<'a, T, Self>;
+    type WIter = VecWindowedIterator<'a, T, A, Self>;
     fn into_window(
         vector: &'a Vec<T>,
         index: usize,
-        border: BorderAction<T>,
+        border: &'a A,
     ) -> Option<Self::Item> {
         if index >= vector.len() {
             return None;
         }
-
-        match border {
-            BorderAction::Constant(_c) => None,
-            BorderAction::Cycle => Some((
-                vector
-                    .get_or_cycle(index as i64 - 1)
+        Some(
+            (vector.get_or_border(index as i64-1, &border)
                     .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_cycle(index as i64)
+             vector.get_or_border(index as i64, &border)
                     .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_cycle(index as i64 + 1)
-                    .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_cycle(index as i64 + 2)
-                    .expect("Failed to get item from Vec"),
-            )),
-            BorderAction::Mirror => Some((
-                vector
-                    .get_or_mirror(index as i64 - 1)
-                    .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_mirror(index as i64)
-                    .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_mirror(index as i64 + 1)
-                    .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_mirror(index as i64 + 2)
-                    .expect("Failed to get item from Vec"),
-            )),
-        }
-        // let len = vector.len();
-        // if index >= len {
-        //     return None;
-        // }
-        // let result = (
-        //     vector
-        //         .get_or_cycle(index as i64 - 1)
-        //         .expect("Failed to get item from Vec"),
-        //     vector
-        //         .get_or_cycle(index as i64)
-        //         .expect("Failed to get item from Vec"),
-        //     vector
-        //         .get_or_cycle(index as i64 + 1)
-        //         .expect("Failed to get item from Vec"),
-        //     vector
-        //         .get_or_cycle(index as i64 + 2)
-        //         .expect("Failed to get item from Vec"),
-        // );
-        // Some(result)
+              vector.get_or_border(index as i64+1, &border)
+                        .expect("Failed to get item from Vec"),
+              vector.get_or_border(index as i64+2, &border)
+                    .expect("Failed to get item from Vec")
+                    ))
     }
 
-    fn into_witer(vec: &'a Vec<T>, border: BorderAction<T>) -> Self::WIter {
+    fn into_witer(vec: &'a Vec<T>, border: &'a A) -> Self::WIter {
         VecWindowedIterator {
             vector: vec,
             index: 0,
@@ -201,44 +163,32 @@ where
     }
 }
 
-impl<'a, T> Windowed<'a, T> for Bkd2<'a, T>
+impl<'a, T, A> Windowed<'a, T, A> for Bkd2<T>
 where
-    T: Copy,
-    std::vec::Vec<T>: GetOr<'a, T>,
+    T: 'a+Copy,
+    A: 'a+BorderAction<'a, T>,
+    std::vec::Vec<T>: GetOr<'a, T, A>,
 {
     type Item = (&'a T, &'a T);
-    type WIter = VecWindowedIterator<'a, T, Self>;
+    type WIter = VecWindowedIterator<'a, T, A, Self>;
     fn into_window(
         vector: &'a Vec<T>,
         index: usize,
-        border: BorderAction<T>,
+        border: &'a A,
     ) -> Option<Self::Item> {
         if index >= vector.len() {
             return None;
         }
 
-        match border {
-            BorderAction::Constant(_c) => None,
-            BorderAction::Cycle => Some((
-                vector
-                    .get_or_cycle(index as i64 - 1)
+        Some(
+            (vector.get_or_border(index as i64-1, &border)
                     .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_cycle(index as i64)
-                    .expect("Failed to get item from Vec"),
-            )),
-            BorderAction::Mirror => Some((
-                vector
-                    .get_or_mirror(index as i64 - 1)
-                    .expect("Failed to get item from Vec"),
-                vector
-                    .get_or_mirror(index as i64)
-                    .expect("Failed to get item from Vec"),
-            )),
-        }
+             vector.get_or_border(index as i64, &border)
+                    .expect("Failed to get item from Vec"))
+            )
     }
 
-    fn into_witer(vec: &'a Vec<T>, border: BorderAction<T>) -> Self::WIter {
+    fn into_witer(vec: &'a Vec<T>, border: &'a A) -> Self::WIter {
         VecWindowedIterator {
             vector: vec,
             index: 0,
@@ -248,45 +198,49 @@ where
     }
 }
 
-trait IntoWindowedIterator<'a, T>
+trait IntoWindowedIterator<'a, T, A>
 where
     T: Copy,
+    A: BorderAction<'a,T>,
 {
-    fn into_witer<W>(self, border: BorderAction<T>) -> W::WIter
+    fn into_witer<W>(self, border: &'a A) -> W::WIter
     where
-        W: Windowed<'a, T>;
+        W: Windowed<'a, T, A>;
 }
 
-impl<'a, T> IntoWindowedIterator<'a, T> for &'a Vec<T>
+impl<'a, T, A> IntoWindowedIterator<'a, T, A> for &'a Vec<T>
 where
     T: Copy,
+    A: 'a+BorderAction<'a,T>,
 {
-    fn into_witer<W>(self, border: BorderAction<T>) -> W::WIter
+    fn into_witer<W>(self, border: &'a A) -> W::WIter
     where
-        W: Windowed<'a, T>,
+        W: Windowed<'a, T, A>,
     {
         W::into_witer(self, border)
     }
 }
 
-struct VecWindowedIterator<'a, T: 'a, W>
+struct VecWindowedIterator<'a, T: 'a, A: 'a, W>
 where
     T: Copy,
+    A: BorderAction<'a,T>,
 {
     vector: &'a Vec<T>,
     index: usize,
-    border: BorderAction<T>,
+    border:  &'a A,
     phantom: PhantomData<&'a W>,
 }
 
-impl<'a, T, W> Iterator for VecWindowedIterator<'a, T, W>
+impl<'a, T, A, W> Iterator for VecWindowedIterator<'a, T, A, W>
 where
     T: Copy,
-    W: Windowed<'a, T>,
+    A: BorderAction<'a,T>,
+    W: Windowed<'a, T, A>,
 {
     type Item = W::Item;
     fn next(&mut self) -> Option<Self::Item> {
-        let res = match W::into_window(self.vector, self.index, self.border) {
+        let res = match W::into_window(self.vector, self.index, &self.border) {
             Some(w) => Some(w),
             _ => None,
         };
@@ -301,9 +255,8 @@ mod tests {
 
     #[test]
     fn forward_window() {
-        use self::BorderAction::Cycle;
-        let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
-        let mut it = v.into_witer::<Fwd2<_>>(Cycle);
+        let v = vec![1., 2., 3., 4., 5.];
+        let mut it = v.into_witer::<Fwd2<_>>(&Cycle(PhantomData));
         let tp = it.next().unwrap();
         assert_eq!(tp, (&1., &2.));
         let tp = it.next().unwrap();
@@ -320,9 +273,8 @@ mod tests {
 
     #[test]
     fn backward_window() {
-        use self::BorderAction::Cycle;
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
-        let mut it = v.into_witer::<Bkd2<_>>(Cycle);
+        let mut it = v.into_witer::<Bkd2<_>>(&Cycle(PhantomData));
         let tp = it.next().unwrap();
         assert_eq!(tp, (&5, &1));
         let tp = it.next().unwrap();
@@ -339,11 +291,10 @@ mod tests {
 
     #[test]
     fn for_forward_iterator2() {
-        use self::BorderAction::Cycle;
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 1;
         let mut v2: u8 = 2;
-        for (i, ip1) in v.into_witer::<Fwd2<_>>(Cycle) {
+        for (i, ip1) in v.into_witer::<Fwd2<_>>(&Cycle(PhantomData)) {
             assert_eq!(*i, v1);
             assert_eq!(*ip1, v2);
             v1 += 1;
@@ -356,13 +307,12 @@ mod tests {
 
     #[test]
     fn for_forward_iterator4() {
-        use self::BorderAction::Cycle;
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 5;
         let mut v2: u8 = 1;
         let mut v3: u8 = 2;
         let mut v4: u8 = 3;
-        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4<_>>(Cycle) {
+        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4<_>>(&Cycle(PhantomData)) {
             assert_eq!(*im1, v1);
             assert_eq!(*i, v2);
             assert_eq!(*ip1, v3);
