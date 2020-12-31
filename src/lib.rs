@@ -7,15 +7,15 @@ struct Fwd4<T>(PhantomData<T>);
 #[allow(dead_code)]
 struct Bkd2<T>(PhantomData<T>);
 
-struct Cycle<T> ( PhantomData<T> );
-struct Mirror<T> ( PhantomData<T> );
+struct Cycle {}
+struct Mirror {}
 struct Constant<'a, T> ( &'a T );
 
 trait BorderAction<'a, T> {
     fn get_border(&self, vector: &'a Vec<T>, index: i64) -> Option<&'a T>;
 }
 
-impl<'a, T> BorderAction<'a,T> for Cycle<T>
+impl<'a, T> BorderAction<'a,T> for Cycle
 where
     T:Copy,
 {
@@ -32,7 +32,7 @@ where
     }
 }
 
-impl<'a, T> BorderAction<'a,T> for Mirror<T>
+impl<'a, T> BorderAction<'a,T> for Mirror
 where
     T:Copy,
 {
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn forward_window() {
         let v = vec![1., 2., 3., 4., 5.];
-        let mut it = v.into_witer::<Fwd2<_>>(&Cycle(PhantomData));
+        let mut it = v.into_witer::<Fwd2<_>>(&Cycle{});
         let tp = it.next().unwrap();
         assert_eq!(tp, (&1., &2.));
         let tp = it.next().unwrap();
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn backward_window() {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
-        let mut it = v.into_witer::<Bkd2<_>>(&Cycle(PhantomData));
+        let mut it = v.into_witer::<Bkd2<_>>(&Cycle{});
         let tp = it.next().unwrap();
         assert_eq!(tp, (&5, &1));
         let tp = it.next().unwrap();
@@ -294,7 +294,7 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 1;
         let mut v2: u8 = 2;
-        for (i, ip1) in v.into_witer::<Fwd2<_>>(&Cycle(PhantomData)) {
+        for (i, ip1) in v.into_witer::<Fwd2<_>>(&Cycle{}) {
             assert_eq!(*i, v1);
             assert_eq!(*ip1, v2);
             v1 += 1;
@@ -312,7 +312,7 @@ mod tests {
         let mut v2: u8 = 1;
         let mut v3: u8 = 2;
         let mut v4: u8 = 3;
-        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4<_>>(&Cycle(PhantomData)) {
+        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4<_>>(&Cycle{}) {
             assert_eq!(*im1, v1);
             assert_eq!(*i, v2);
             assert_eq!(*ip1, v3);
