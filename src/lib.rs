@@ -1,14 +1,11 @@
 use std::marker::PhantomData;
 
-#[allow(dead_code)]
 struct Fwd2();
-#[allow(dead_code)]
 struct Fwd4();
-#[allow(dead_code)]
 struct Bkd2();
 
-struct Cycle {}
-struct Mirror {}
+struct Cycle();
+struct Mirror();
 struct Constant<'a, T> ( &'a T );
 
 trait BorderAction<'a, T> {
@@ -256,7 +253,7 @@ mod tests {
     #[test]
     fn forward_window() {
         let v = vec![1., 2., 3., 4., 5.];
-        let mut it = v.into_witer::<Fwd2>(&Cycle{});
+        let mut it = v.into_witer::<Fwd2>(&Cycle());
         let tp = it.next().unwrap();
         assert_eq!(tp, (&1., &2.));
         let tp = it.next().unwrap();
@@ -274,7 +271,7 @@ mod tests {
     #[test]
     fn backward_window() {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
-        let mut it = v.into_witer::<Bkd2>(&Cycle{});
+        let mut it = v.into_witer::<Bkd2>(&Cycle());
         let tp = it.next().unwrap();
         assert_eq!(tp, (&5, &1));
         let tp = it.next().unwrap();
@@ -294,7 +291,7 @@ mod tests {
         let v: Vec<u8> = vec![1, 2, 3, 4, 5];
         let mut v1: u8 = 1;
         let mut v2: u8 = 2;
-        for (i, ip1) in v.into_witer::<Fwd2>(&Cycle{}) {
+        for (i, ip1) in v.into_witer::<Fwd2>(&Cycle()) {
             assert_eq!(*i, v1);
             assert_eq!(*ip1, v2);
             v1 += 1;
@@ -312,7 +309,7 @@ mod tests {
         let mut v2: u8 = 1;
         let mut v3: u8 = 2;
         let mut v4: u8 = 3;
-        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4>(&Cycle{}) {
+        for (im1, i, ip1, ip2) in v.into_witer::<Fwd4>(&Cycle()) {
             assert_eq!(*im1, v1);
             assert_eq!(*i, v2);
             assert_eq!(*ip1, v3);
